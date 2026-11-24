@@ -1,0 +1,5 @@
+.env
+cookies.json
+seen.json
+debug_profile.html
+__pycache__/
