@@ -6,6 +6,9 @@ Usage:
   python watcher.py            # run forever
   python watcher.py --once     # single check, then exit
   python watcher.py --inspect  # dump the Profile page HTML to debug_profile.html
+
+Two sources are watched: the logged-in Profile page, and the public
+https://paa.gov.pk/media/job-opportunities page (read via the site's content API).
 """
 import json
 import os
@@ -24,9 +27,18 @@ BASE = "https://apps.paa.gov.pk:2016/"
 LOGIN_URL = urljoin(BASE, "default.aspx")
 PROFILE_URL = urljoin(BASE, "Applicant/Profile.aspx")
 
+# Public site: a React app whose /media/job-opportunities route is client-side only,
+# so we read the same content API the page itself uses.
+PUBLIC_PAGE_URL = "https://paa.gov.pk/media/job-opportunities"
+PUBLIC_API = "https://paawebadmin.paa.gov.pk/api/v1/Content/GetContentById"
+PUBLIC_PAGE_ID = "4953bdd9-4e95-41f9-95c3-88de4f076cc4"  # Umbraco node "Job Opportunities"
+PUBLIC_API_KEY = "123456789_API"  # public key embedded in the site's own JS bundle
+PUBLIC_MEDIA = "https://paawebadmin.paa.gov.pk"
+
 HERE = Path(__file__).resolve().parent
 COOKIE_FILE = HERE / "cookies.json"
 SEEN_FILE = HERE / "seen.json"
+PUBLIC_SEEN_FILE = HERE / "seen_public.json"
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36"
 
 
@@ -192,6 +204,54 @@ def fetch_jobs(s):
     return list(jobs.values())
 
 
+def fetch_public_jobs():
+    """Every notice/opportunity listed on the public Job Opportunities page."""
+    r = requests.get(
+        PUBLIC_API,
+        params={"Id": PUBLIC_PAGE_ID, "ApiKey": PUBLIC_API_KEY},
+        headers={"User-Agent": UA},
+        timeout=30,
+    )
+    r.raise_for_status()
+    items = r.json()["data"]["en"]["properties"]["jobItemList"]["items"]
+    out = {}
+    for it in items:
+        c = it["content"]
+        p = c["properties"]
+        pdfs = [urljoin(PUBLIC_MEDIA, f["url"]) for f in (p.get("pDF") or []) if f.get("url")]
+        out[c["id"]] = {
+            "id": c["id"],
+            "category": (p.get("category") or "").strip(),
+            "title": (p.get("jobTitle") or "").strip(),
+            "description": (p.get("jobDescription") or "").strip(),
+            "published": (p.get("publishDate") or "")[:10],
+            "pdf": pdfs[0] if pdfs else PUBLIC_PAGE_URL,
+        }
+    return out
+
+
+def check_public():
+    current = fetch_public_jobs()
+    if not PUBLIC_SEEN_FILE.exists():
+        # first run: just record what's already there, don't alert on 200+ old items
+        PUBLIC_SEEN_FILE.write_text(json.dumps(sorted(current)))
+        notify(
+            f"PAA public page watcher started ({len(current)} items currently listed)",
+            f"Watching {PUBLIC_PAGE_URL}",
+        )
+        return
+    seen = set(json.loads(PUBLIC_SEEN_FILE.read_text()))
+    new = [j for i, j in current.items() if i not in seen]
+    for j in new:
+        label = "NEW PAA JOB AD" if j["category"] == "Opportunity" else "NEW PAA NOTICE"
+        notify(
+            label,
+            f"{j['title']}\n{j['description']}\nPublished: {j['published']}\n\n{j['pdf']}\nPage: {PUBLIC_PAGE_URL}",
+        )
+    PUBLIC_SEEN_FILE.write_text(json.dumps(sorted(seen | set(current))))
+    print(f"{time.strftime('%H:%M:%S')} public page checked: {len(current)} listed, {len(new)} new", flush=True)
+
+
 def key(j):
     return f"{j['notice']} | {j['title']}"
 
@@ -240,19 +300,22 @@ def main():
         return
     if "--once" in sys.argv:
         check(s)
+        check_public()
         return
     errors = 0
     while True:
-        try:
-            check(s)
-            errors = 0
-        except SystemExit:
-            raise
-        except Exception as e:  # network blips etc.
-            errors += 1
-            print("error:", repr(e), flush=True)
-            if errors == 5:
-                notify("PAA watcher is failing", repr(e))
+        failed = None
+        for fn in (lambda: check(s), check_public):
+            try:
+                fn()
+            except SystemExit:
+                raise
+            except Exception as e:  # network blips etc.; one source failing must not stop the other
+                failed = e
+                print("error:", repr(e), flush=True)
+        errors = errors + 1 if failed else 0
+        if errors == 5:
+            notify("PAA watcher is failing", repr(failed))
         time.sleep(POLL + random.uniform(0, POLL * 0.2))
 
 
