@@ -4,7 +4,12 @@ meta_title: PAA Jobs Alerts for Pakistani Job Applicants
 slug: paa-jobs-notice-polling
 description: Our bot checks two PAA listing pages every minute and pings your phone the moment a new notice appears.
 chosen_keyword: paa jobs
-secondary_keywords: []
+secondary_keywords: [paa careers, paa vacancies, paa recruitment, pakistan airports authority jobs, paa career alerts]
+thumbnail_text:
+  category_chip: Job Alerts
+  headline: [Job Notice, Alert Bot]
+  descriptor: Phone alerts the minute a notice posts.
+  alt: Two source pages feeding one phone with a highlighted new vacancy title alert
 schema_type: SoftwareApplication
 -->
 
@@ -12,9 +17,11 @@ schema_type: SoftwareApplication
 
 > A small Python bot that watches the Pakistan Airports Authority's hiring pages and messages you the moment something new is posted.
 
+![Two source pages feeding one phone with a highlighted new vacancy title alert](images/hero.png)
+
 PAA Jobs Watcher checks the two places where the Pakistan Airports Authority (PAA) publishes hiring news: the logged-in applicant profile and the public [Job Opportunities page](https://paa.gov.pk/media/job-opportunities). About once a minute it compares what is listed against what it has already seen. When a new notice, job ad or vacancy title appears, it sends a message to Telegram, Discord and your desktop. You run it yourself, on your own computer, with your own PAA login. It is an independent tool and is not made or endorsed by the PAA.
 
-## Why checking by hand fails
+## Why following PAA careers news by hand fails
 
 Hiring notices from a government body rarely arrive by email. They appear on a web page, sometimes with a short window to apply, and the only way to catch one is to keep opening the page. People refresh it between meetings, forget for a few days, then find a closing date that has already passed.
 
@@ -22,7 +29,7 @@ The applicant profile is harder still. Vacancies there sit inside two linked dro
 
 The watcher removes that chore. It does the clicking and the comparing, remembers every listing it has ever shown you, and speaks up only when something is new.
 
-## What it watches
+## Where PAA vacancies are posted
 
 ### The logged-in applicant profile
 
@@ -50,7 +57,9 @@ Entries in the Opportunity category are labeled as job ads, and everything else 
 | A warning when it breaks | Silence could mean nothing is new, or that the tool has stopped working. After five failed rounds in a row it sends a "PAA watcher is failing" alert with the error. |
 | Two debug switches | Page layouts change. `--once` runs a single check and exits, and `--inspect` saves the profile page to `debug_profile.html` so you can see what the watcher sees. |
 
-## How a new listing becomes an alert
+## How PAA recruitment notices become alerts
+
+![Two sources feed a saved list check that triggers Telegram, Discord or desktop alerts](images/how-it-works.png)
 
 Each round follows the same five steps for both sources:
 
@@ -62,7 +71,9 @@ Each round follows the same five steps for both sources:
 
 This design has one limit worth knowing. If the authority edits the wording of a notice or title, the new wording looks like a new listing and you will get one extra alert. That is a cheap price for never missing a real one.
 
-## Where the alerts arrive
+![Timeline showing a saved baseline, quiet checks, then one alert for a new listing](images/first-run.png)
+
+## Where your PAA career alerts arrive
 
 **Telegram** is the best choice for a phone. You create a bot with [BotFather](https://core.telegram.org/bots/features#botfather), message it once, and put its token and your chat ID in the settings file. The watcher then calls the [Telegram Bot API](https://core.telegram.org/bots/api) to send each alert.
 
@@ -82,7 +93,7 @@ Published: 2026-01-15
 Page: https://paa.gov.pk/media/job-opportunities
 ```
 
-## Who it helps
+## Who needs Pakistan Airports Authority jobs alerts
 
 - **An applicant waiting on one department.** The new vacancy title reaches your phone within about a minute of being added, instead of whenever you next remember to look.
 - **Someone gathering documents early.** Public alerts include the PDF link, so you can read the requirements and closing date the same hour the notice goes up.
@@ -119,6 +130,7 @@ python watcher.py
 ```text
 paa_job_watcher/
 ├── watcher.py          # the whole bot, one file
+├── images/             # cover and diagrams used in this page
 ├── .env.example        # settings template
 ├── .env                # your settings (kept out of git)
 ├── .gitignore          # keeps secrets and saved state out of git
